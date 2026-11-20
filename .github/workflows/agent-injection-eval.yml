@@ -1,0 +1,82 @@
+# Agent prompt-injection eval: 150 FinanceBench questions, filing pages with real attacker text hidden
+# inside, 4 defence settings plus a code policy, two free local models; commit the results.
+#
+# Start it from the Actions tab, or by changing projects/tech/agent-injection-guardrails/run-request.txt.
+name: agent-injection-eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_run:
+        description: "Only merge: take the shard files from this earlier run id"
+        required: false
+        default: ""
+  push:
+    paths: ["projects/tech/agent-injection-guardrails/run-request.txt"]
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
+  LLM_PROVIDER: ollama
+  EVAL_MODELS: qwen2.5:3b,llama3.2:3b
+  SHARDS: "20"
+
+jobs:
+  answer:
+    if: ${{ !inputs.from_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -e .
+      - uses: actions/cache@v4
+        with: { path: ~/.ollama/models, key: ollama-qwen2.5-3b-llama3.2-3b }
+      - name: Install and start Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          (ollama serve > /tmp/ollama.log 2>&1 &)
+          for i in $(seq 30); do curl -s localhost:11434/api/tags >/dev/null && break; sleep 2; done
+          ollama pull qwen2.5:3b; ollama pull llama3.2:3b
+      - name: Run agent episodes for this shard
+        working-directory: projects/tech/agent-injection-guardrails
+        run: python run_eval.py --shard "${{ matrix.shard }}/$SHARDS"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ag-shard-${{ matrix.shard }}
+          path: projects/tech/agent-injection-guardrails/results/episodes_shard*.jsonl
+          if-no-files-found: ignore
+
+  merge:
+    needs: answer
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -e .
+      - uses: actions/download-artifact@v4
+        with: { path: shards, pattern: "ag-shard-*", merge-multiple: true, run-id: "${{ inputs.from_run || github.run_id }}", github-token: "${{ github.token }}" }
+      - name: Merge shards and summarize
+        working-directory: projects/tech/agent-injection-guardrails
+        run: |
+          mkdir -p results
+          cp ../../../shards/*.jsonl results/
+          python run_eval.py --merge
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add projects/tech/agent-injection-guardrails/results/
+          git commit -m "Agent injection results [skip ci]" || echo "nothing to commit"
+          git pull --rebase && git push

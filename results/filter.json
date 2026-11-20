@@ -1,0 +1,43 @@
+{
+  "deepset_only": {
+    "deepset_test": {
+      "n": 116,
+      "precision": 0.978,
+      "recall": 0.75,
+      "f1": 0.849
+    },
+    "gandalf_full_prompts_flagged": 0.961,
+    "gandalf_openers_flagged": 0.976,
+    "injected_attack_line_removed": 1.0,
+    "clean_filing_lines": 14306,
+    "clean_filing_lines_flagged": 752,
+    "clean_pages_with_a_line_removed": "134 of 150",
+    "examples_of_clean_lines_flagged": [
+      "Depreciation and amortization",
+      "Purchases of marketable securities and investments",
+      "Proceeds from maturities and sale of marketable securities and investments",
+      "Dividends paid to shareholders",
+      "Cash and cash equivalents at beginning of year",
+      "Cash and cash equivalents at end of period",
+      "The accompanying Notes to Consolidated Financial Statements are an integral part of this statement.",
+      "Cash and cash equivalents",
+      "Accounts receivable net of allowances of $95 and $103",
+      "Commitments and contingencies (Note 16)"
+    ]
+  },
+  "deepset_plus_filing_text": {
+    "deepset_test": {
+      "n": 116,
+      "precision": 0.962,
+      "recall": 0.85,
+      "f1": 0.903
+    },
+    "gandalf_full_prompts_flagged": 0.898,
+    "gandalf_openers_flagged": 0.939,
+    "injected_attack_line_removed": 0.997,
+    "clean_filing_lines": 14306,
+    "clean_filing_lines_flagged": 0,
+    "clean_pages_with_a_line_removed": "0 of 150",
+    "examples_of_clean_lines_flagged": []
+  }
+}
