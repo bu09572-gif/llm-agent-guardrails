@@ -1,1 +1,2 @@
 run 1: qwen2.5:3b + llama3.2:3b, 150 questions x clean/email/link x 4 defences
+run 2: fix KeyError crash; finish the 135 cases run 1 left

@@ -162,7 +162,7 @@ def run(question: str, page: str, model: str, spotlight: bool = False) -> Episod
             done, why = policy(question, a)
             if why:
                 ep.policy_events.append(why)
-            ep.answer_after_policy = done["text"]
+            ep.answer_after_policy = str(done.get("text", ""))
             break
         else:
             obs = 'Not a valid action. Reply with one JSON object with "action": read_page, send_email or answer.'

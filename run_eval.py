@@ -92,7 +92,12 @@ def _report(f: ag.InjectionFilter) -> dict:
 def run(shard: str) -> None:
     i, n = map(int, shard.split("/"))
     f = trained_filter()
-    todo = cases()[i::n]
+    have = set()
+    if (OUT / "episodes.jsonl").exists():          # a rerun only does the cases an earlier run didn't finish
+        old = pd.read_json(OUT / "episodes.jsonl", lines=True)
+        cnt = old[old.error.fillna("") == ""].groupby(["id", "condition"]).size()
+        have = {k for k, v in cnt.items() if v == 4 * len(MODELS)}
+    todo = [c for c in cases() if (c["id"], c["condition"]) not in have][i::n]
     OUT.mkdir(exist_ok=True)
     with (OUT / f"episodes_shard{i}.jsonl").open("w") as fh:
         for k, c in enumerate(todo):
@@ -154,7 +159,13 @@ def summarize(df: pd.DataFrame) -> dict:
 
 def merge() -> dict:
     files = sorted(OUT.glob("episodes_shard*.jsonl"))
-    df = pd.concat([pd.read_json(f, lines=True) for f in files if f.stat().st_size], ignore_index=True)
+    parts = [pd.read_json(f, lines=True) for f in files if f.stat().st_size]
+    if (OUT / "episodes.jsonl").exists():
+        parts.insert(0, pd.read_json(OUT / "episodes.jsonl", lines=True))
+    df = pd.concat(parts, ignore_index=True)
+    df["_ok"] = df.error.fillna("") == ""
+    df = (df.sort_values("_ok", kind="stable")       # a successful episode replaces a failed one
+          .drop_duplicates(["id", "condition", "model", "spotlight", "filter"], keep="last").drop(columns="_ok"))
     df.to_json(OUT / "episodes.jsonl", orient="records", lines=True)
     for f in files:
         f.unlink()
