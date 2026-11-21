@@ -1,0 +1,7 @@
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.4
+requests>=2.31
+pyarrow>=15
+pytest>=8
+ruff>=0.5

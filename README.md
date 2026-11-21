@@ -1,5 +1,7 @@
 # Tool-Using Agent with Prompt-Injection Guardrails
 
+[![tests](https://github.com/bu09572-gif/llm-agent-guardrails/actions/workflows/tests.yml/badge.svg)](https://github.com/bu09572-gif/llm-agent-guardrails/actions/workflows/tests.yml)
+
 An agent that reads documents and can take actions has a new attack surface: the document itself. This project builds a small finance agent with an email tool and attacks it the realistic way. Real attacker text is hidden inside the SEC filing page it reads, an *indirect* prompt injection. I then measure which guardrails actually stop it, and what each one costs in normal use.
 
 The short answer: **a prompt telling the model to ignore instructions in documents does nothing. Rules enforced in code stop every attack, and a small domain-tuned classifier stops almost all of them without hurting answers.**
@@ -72,3 +74,7 @@ pytest -q test_agent_guardrails.py      # unit tests with a scripted model
 python run_eval.py --filter-report      # filter only, CPU, under a minute -> results/filter.json
 # full agent grid: change run-request.txt; GitHub Actions (agent-injection-eval) runs 20 shards and commits results/
 ```
+
+---
+
+Part of my [AI/ML and data engineering portfolio](https://github.com/bu09572-gif/ai-ml-portfolio), where every project uses real public data and free, open-source tools.

@@ -16,12 +16,12 @@ import json
 import os
 from pathlib import Path
 
-import agent as ag
-import data
 import numpy as np
 import pandas as pd
 from sklearn.metrics import precision_recall_fscore_support
 
+import agent as ag
+import data
 from evalkit.metrics import numeric_match
 
 OUT = Path(__file__).resolve().parent / "results"

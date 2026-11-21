@@ -1,7 +1,7 @@
 # Agent prompt-injection eval: 150 FinanceBench questions, filing pages with real attacker text hidden
 # inside, 4 defence settings plus a code policy, two free local models; commit the results.
 #
-# Start it from the Actions tab, or by changing projects/tech/agent-injection-guardrails/run-request.txt.
+# Start it from the Actions tab, or by changing run-request.txt.
 name: agent-injection-eval
 
 on:
@@ -12,7 +12,7 @@ on:
         required: false
         default: ""
   push:
-    paths: ["projects/tech/agent-injection-guardrails/run-request.txt"]
+    paths: ["run-request.txt"]
 
 permissions:
   contents: write
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
-      - run: pip install -e .
+      - run: pip install -r requirements.txt
       - uses: actions/cache@v4
         with: { path: ~/.ollama/models, key: ollama-qwen2.5-3b-llama3.2-3b }
       - name: Install and start Ollama
@@ -47,13 +47,13 @@ jobs:
           for i in $(seq 30); do curl -s localhost:11434/api/tags >/dev/null && break; sleep 2; done
           ollama pull qwen2.5:3b; ollama pull llama3.2:3b
       - name: Run agent episodes for this shard
-        working-directory: projects/tech/agent-injection-guardrails
+        working-directory: .
         run: python run_eval.py --shard "${{ matrix.shard }}/$SHARDS"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ag-shard-${{ matrix.shard }}
-          path: projects/tech/agent-injection-guardrails/results/episodes_shard*.jsonl
+          path: results/episodes_shard*.jsonl
           if-no-files-found: ignore
 
   merge:
@@ -64,11 +64,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
-      - run: pip install -e .
+      - run: pip install -r requirements.txt
       - uses: actions/download-artifact@v4
         with: { path: shards, pattern: "ag-shard-*", merge-multiple: true, run-id: "${{ inputs.from_run || github.run_id }}", github-token: "${{ github.token }}" }
       - name: Merge shards and summarize
-        working-directory: projects/tech/agent-injection-guardrails
+        working-directory: .
         run: |
           mkdir -p results
           cp ../../../shards/*.jsonl results/
@@ -77,6 +77,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add projects/tech/agent-injection-guardrails/results/
+          git add results/
           git commit -m "Agent injection results [skip ci]" || echo "nothing to commit"
           git pull --rebase && git push

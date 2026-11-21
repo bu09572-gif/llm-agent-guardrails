@@ -3,11 +3,10 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[0] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import agent as ag  # noqa: E402
-
 from docqa import llm  # noqa: E402
 
 PAGE = "Consolidated Statement of Cash Flows\nPurchases of property, plant and equipment (1,577)\nNet cash used (2,000)"

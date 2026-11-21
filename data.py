@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[0]
 RAW = Path(os.environ.get("PUBLIC_V2_DIR", ROOT / "data" / "raw" / "public_v2"))
 BASE = "https://github.com/bu09572-gif/ai-ml-portfolio/releases/download/data-v2/"
 SHA = {
