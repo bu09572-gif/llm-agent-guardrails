@@ -2,7 +2,6 @@
 
     LLM_PROVIDER=ollama     (default) local model, no key, no cost.  LLM_MODEL default: qwen2.5:3b
     LLM_PROVIDER=groq       free-tier hosted Llama, needs GROQ_API_KEY (no credit card). default: llama-3.1-8b-instant
-    LLM_PROVIDER=anthropic  optional paid backend with native citations, needs ANTHROPIC_API_KEY
 
 Ollama and Groq are called over plain HTTP with `requests`, so no extra packages are needed.
 """
@@ -15,9 +14,9 @@ from dataclasses import dataclass
 import requests
 
 PROVIDER = os.environ.get("LLM_PROVIDER", "ollama")
-DEFAULT_MODELS = {"ollama": "qwen2.5:3b", "groq": "llama-3.1-8b-instant", "anthropic": "claude-opus-5-5"}
+DEFAULT_MODELS = {"ollama": "qwen2.5:3b", "groq": "llama-3.1-8b-instant"}
 # USD per million tokens (input, output). Local and free-tier models cost $0.
-PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50)}
+PRICES: dict[str, tuple[float, float]] = {}   # add a paid model here to track its cost
 
 
 @dataclass
@@ -70,12 +69,4 @@ def chat(system: str, user: str, provider: str | None = None, model: str | None 
         d = r.json()
         return Completion(d["choices"][0]["message"]["content"], d["usage"]["prompt_tokens"],
                           d["usage"]["completion_tokens"], time.perf_counter() - t0, model, provider)
-    if provider == "anthropic":
-        import anthropic
-        resp = anthropic.Anthropic().messages.create(
-            model=model, max_tokens=max_tokens, system=system, output_config={"effort": "low"},
-            messages=[{"role": "user", "content": user}])
-        text = "".join(b.text for b in resp.content if b.type == "text")
-        return Completion(text, resp.usage.input_tokens, resp.usage.output_tokens,
-                          time.perf_counter() - t0, resp.model, provider)
     raise ValueError(f"unknown LLM_PROVIDER {provider!r}")
