@@ -1,0 +1,23 @@
+# docker compose up --build      then open http://localhost:8100 (first start downloads 84 filings, ~2 min)
+services:
+  ollama:
+    image: ollama/ollama:0.12.6
+    volumes: ["ollama:/root/.ollama"]
+    ports: ["11434:11434"]
+  pull-model:
+    image: ollama/ollama:0.12.6
+    depends_on: [ollama]
+    environment: { OLLAMA_HOST: "http://ollama:11434" }
+    entrypoint: ["ollama", "pull", "qwen2.5:3b"]
+  inbox:
+    build: .
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      TOOLGUARD_MODEL: qwen2.5:3b
+      TOOLGUARD_APPROVAL_TIMEOUT: "300"
+    volumes: ["filings:/app/data"]
+    ports: ["8100:8100"]
+volumes:
+  ollama: {}
+  filings: {}
