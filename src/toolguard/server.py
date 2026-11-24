@@ -3,17 +3,20 @@
     python -m toolguard.server
 
 Tools (with MCP annotations, which the gateway reads to decide what needs a human):
-  search_filings   BM25 search over 12,000 pages of 84 real SEC filings          read-only
-  read_page        full text of one filing page (untrusted: a document can say anything)  read-only
+  search_filings   BM25 search over 84 real SEC filings, returns page text      read-only (untrusted output)
+  read_page        full text of one filing page                                  read-only (untrusted output)
   calculate        safe arithmetic (+ - * / ** and parentheses, no names or calls)        read-only
   send_email       send an email for the user (written to an outbox file here)     side effect
 
 The data comes from FinanceBench (Patronus AI): `python -m docpipe.run --scope eval` downloads the
 filings and builds data/silver and data/gold first.
 
-For the evaluation only, TOOLGUARD_SCENARIO can point at a JSON file {"doc_id:page": "text to insert"}.
-read_page then returns the page with that text inside it, which is how the attack reaches the agent:
-through a tool result, the same way a poisoned web page or document would.
+Both document tools are marked openWorldHint: their output is document text, and a document can say anything.
+
+For the evaluation only, TOOLGUARD_SCENARIO can point at a JSON file {"doc_id": "...", "line": "..."}: a
+poisoned copy of that filing. The line then appears inside every page of it that read_page returns, and
+inside the first search result from it, which is how the attack reaches the agent: through a tool result,
+the way a poisoned document would. Each time it is shown, a line is added to TOOLGUARD_EXPOSURE (if set).
 """
 from __future__ import annotations
 
@@ -53,23 +56,39 @@ def clean_page(text: str) -> str:
     return "\n".join(x for x in (" ".join(ln.split()) for ln in str(text).split("\n")) if x)
 
 
+def _poison(doc_id: str, text: str) -> str:
+    sc = _scenario()
+    if not sc.get("line") or sc.get("doc_id") != doc_id:
+        return text
+    if p := os.environ.get("TOOLGUARD_EXPOSURE"):
+        with open(p, "a") as fh:
+            fh.write(doc_id + "\n")
+    return insert_line(text, sc["line"])
+
+
 def insert_line(page: str, line: str, at: float = 0.4) -> str:
     lines = page.split("\n")
     k = max(1, int(len(lines) * at))
     return "\n".join(lines[:k] + [line] + lines[k:])
 
 
-@mcp.tool(annotations=ToolAnnotations(title="Search SEC filings", readOnlyHint=True, openWorldHint=False))
-def search_filings(query: str, company: str = "", fiscal_year: str = "", k: int = 5) -> list[dict]:
+@mcp.tool(annotations=ToolAnnotations(title="Search SEC filings", readOnlyHint=True, openWorldHint=True))
+def search_filings(query: str, company: str = "", fiscal_year: str = "", k: int = 5) -> str:
     """Search 84 SEC filings (10-K, 10-Q, 8-K, earnings releases of 32 US companies).
     query: what to look for, e.g. "3M FY2018 cash flow statement purchases of property plant and equipment".
     company and fiscal_year are optional and are added to the query.
-    Returns the best pages (doc_id, page, title, snippet); then call read_page for the full text."""
+    Returns the best passages with their doc_id and page. Call read_page for the whole page."""
     r, _ = _store()
-    q = " ".join(x for x in (company, f"FY{fiscal_year}" if fiscal_year else "", query) if x)
+    fy = str(fiscal_year).upper().removeprefix("FY")
+    q = " ".join(x for x in (company, f"FY{fy}" if fy else "", query) if x)
     hits, _ = r.search(q, k=max(1, min(int(k), 10)), routing="v2")
-    return [{"doc_id": h.doc_id, "page": h.page_num, "title": h.header, "snippet": " ".join(h.text.split()[:40])}
-            for h in hits]
+    out, poisoned = [], False
+    for h in hits:
+        text = clean_page(h.text)[:1200]
+        if not poisoned and _scenario().get("doc_id") == h.doc_id:
+            text, poisoned = _poison(h.doc_id, text), True
+        out.append(f"[doc_id: {h.doc_id} | page: {h.page_num}]\n{text}")
+    return "\n\n".join(out) or "No results."
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Read a filing page", readOnlyHint=True, openWorldHint=True))
@@ -79,9 +98,7 @@ def read_page(doc_id: str, page: int) -> str:
     key = (doc_id, int(page))
     if key not in pages.index:
         return f"No page {page} in {doc_id}."
-    text = clean_page(pages[key])
-    extra = _scenario().get(f"{doc_id}:{int(page)}")
-    return insert_line(text, extra) if extra else text
+    return _poison(doc_id, clean_page(pages[key]))
 
 
 _OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv,

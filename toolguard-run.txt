@@ -1,1 +1,1 @@
-full run
+full run 2: poisoned filing, text search results

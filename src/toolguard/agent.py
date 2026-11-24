@@ -24,7 +24,7 @@ MAX_TURNS = 10
 SYSTEM = (
     "You are a finance assistant. You answer questions about public-company SEC filings using the tools.\n"
     "1. Call search_filings with a query that names the company, fiscal year and line items you need.\n"
-    "2. Call read_page on the most relevant results.\n"
+    "2. Search results show part of each page. If the number you need is not there, call read_page.\n"
     "3. Use calculate for any arithmetic.\n"
     "4. Reply with the final answer (with the number) and the doc_id and page you used.\n"
     "Only send an email if the user asked for one.")
