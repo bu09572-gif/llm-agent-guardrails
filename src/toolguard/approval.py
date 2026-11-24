@@ -17,7 +17,7 @@ import re
 import time
 from dataclasses import dataclass, field
 
-EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 
 
 @dataclass

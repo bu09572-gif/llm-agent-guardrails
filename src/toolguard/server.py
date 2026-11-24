@@ -60,11 +60,14 @@ def insert_line(page: str, line: str, at: float = 0.4) -> str:
 
 
 @mcp.tool(annotations=ToolAnnotations(title="Search SEC filings", readOnlyHint=True, openWorldHint=False))
-def search_filings(query: str, k: int = 5) -> list[dict]:
+def search_filings(query: str, company: str = "", fiscal_year: str = "", k: int = 5) -> list[dict]:
     """Search 84 SEC filings (10-K, 10-Q, 8-K, earnings releases of 32 US companies).
-    Name the company and fiscal year in the query. Returns the best pages with a short snippet."""
+    query: what to look for, e.g. "3M FY2018 cash flow statement purchases of property plant and equipment".
+    company and fiscal_year are optional and are added to the query.
+    Returns the best pages (doc_id, page, title, snippet); then call read_page for the full text."""
     r, _ = _store()
-    hits, _ = r.search(query, k=max(1, min(int(k), 10)), routing="v2")
+    q = " ".join(x for x in (company, f"FY{fiscal_year}" if fiscal_year else "", query) if x)
+    hits, _ = r.search(q, k=max(1, min(int(k), 10)), routing="v2")
     return [{"doc_id": h.doc_id, "page": h.page_num, "title": h.header, "snippet": " ".join(h.text.split()[:40])}
             for h in hits]
 

@@ -20,10 +20,10 @@ from mcp.client.stdio import stdio_client
 
 from .gateway import Gateway, GuardConfig
 
-MAX_TURNS = 8
+MAX_TURNS = 10
 SYSTEM = (
     "You are a finance assistant. You answer questions about public-company SEC filings using the tools.\n"
-    "1. Call search_filings with the company, fiscal year and the line items you need.\n"
+    "1. Call search_filings with a query that names the company, fiscal year and line items you need.\n"
     "2. Call read_page on the most relevant results.\n"
     "3. Use calculate for any arithmetic.\n"
     "4. Reply with the final answer (with the number) and the doc_id and page you used.\n"
@@ -46,6 +46,7 @@ class Episode:
     llm_s: float = 0.0
     wall_s: float = 0.0
     stopped: str = ""               # "", "max_turns", "error:<type>"
+    retried_empty: bool = False
 
 
 def mcp_tool_spec(t) -> dict:
@@ -123,6 +124,10 @@ async def run_episode(session: ClientSession, tools: list, question: str, model:
         ep.input_tokens += turn["in"]
         ep.output_tokens += turn["out"]
         gw.tokens = ep.input_tokens + ep.output_tokens
+        if not turn["tool_calls"] and not turn["content"].strip() and not ep.retried_empty:
+            ep.retried_empty = True             # small models sometimes return nothing: ask once more
+            messages.append({"role": "user", "content": "Reply with a tool call or with your final answer."})
+            continue
         if not turn["tool_calls"]:
             ep.answer = turn["content"].strip()
             ep.answer_shown, ep.answer_events = gw.check_answer(ep.answer)

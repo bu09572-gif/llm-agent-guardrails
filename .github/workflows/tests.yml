@@ -14,4 +14,4 @@ jobs:
         with: { python-version: "3.12", cache: pip }
       - run: pip install -r requirements.txt
       - run: ruff check .
-      - run: pytest -q test_agent_guardrails.py
+      - run: pytest -q test_agent_guardrails.py test_toolguard.py

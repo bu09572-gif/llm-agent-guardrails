@@ -4,7 +4,8 @@ MCP server, and every tool result goes through here before it reaches the model.
 Checks on a call, in order (the first that fails decides):
   1. budget      total tool calls, calls per tool, tokens and wall-clock time for the episode
   2. allowlist   only the tools this deployment allows
-  3. schema      arguments must match the tool's JSON schema from the MCP server
+  3. schema      arguments must match the tool's JSON schema from the MCP server (a number sent as a
+                 string, "5" for an integer, is converted first and the fix is logged)
   4. policy      rules in code: email only to addresses the user typed
   5. approval    a person approves any tool whose MCP annotations say it is not read-only
 
@@ -35,8 +36,8 @@ URL = re.compile(r"https?://[^\s)\]>\"']+|\b[\w-]+\.(?:com|net|org|io)/[^\s)\]>\
 
 @dataclass
 class Limits:
-    max_tool_calls: int = 10
-    per_tool: dict = field(default_factory=lambda: {"send_email": 2, "search_filings": 4, "read_page": 5})
+    max_tool_calls: int = 14
+    per_tool: dict = field(default_factory=lambda: {"send_email": 2, "search_filings": 6, "read_page": 6})
     max_tokens: int = 40_000
     max_seconds: float = 600
 
@@ -63,6 +64,7 @@ class CallDecision:
     reason: str = ""
     approved_by: str = ""
     would_block: bool = False  # shadow mode: a check failed but the call ran anyway
+    coerced: list = field(default_factory=list)
     ms: float = 0.0
 
 
@@ -93,6 +95,23 @@ class Gateway:
         a = getattr(self.tools.get(name), "annotations", None)
         return bool(a and a.openWorldHint)
 
+    def coerce(self, name: str, args: dict) -> tuple[dict, list[str]]:
+        """Convert numeric strings where the schema wants a number. Small models do this a lot."""
+        props = (getattr(self.tools.get(name), "inputSchema", None) or {}).get("properties", {})
+        out, fixed = dict(args), []
+        for k, v in args.items():
+            t = props.get(k, {}).get("type")
+            if isinstance(v, str) and t in ("integer", "number"):
+                try:
+                    out[k] = int(v) if t == "integer" else float(v)
+                    fixed.append(k)
+                except ValueError:
+                    pass
+            elif isinstance(v, (int, float)) and t == "string":
+                out[k] = str(v)
+                fixed.append(k)
+        return out, fixed
+
     def _check(self, name: str, args: dict) -> tuple[str, str]:
         c, lim = self.cfg, self.cfg.limits
         if sum(self.calls.values()) >= lim.max_tool_calls:
@@ -119,8 +138,9 @@ class Gateway:
     async def call(self, name: str, args: dict) -> tuple[str, CallDecision]:
         t = time.perf_counter()
         args = args if isinstance(args, dict) else {}
+        args, fixed = self.coerce(name, args)
         layer, reason = self._check(name, args)
-        d = CallDecision(name, args, allowed=not layer, layer=layer, reason=reason)
+        d = CallDecision(name, args, allowed=not layer, layer=layer, reason=reason, coerced=fixed)
         if not layer and self.side_effect(name) and self.cfg.approval is not None:
             dec = await self.cfg.approval.decide(ApprovalRequest(name, args, self.user_message))
             d.approved_by = dec.by
