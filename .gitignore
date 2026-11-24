@@ -7,3 +7,5 @@ __pycache__/
 .venv/
 spark-warehouse/
 metastore_db/
+data
+outbox.jsonl
